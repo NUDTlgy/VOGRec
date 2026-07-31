@@ -93,8 +93,6 @@ Maximum-order experiments use the same main entry point:
 python train.py --data /path/to/data.csv --max-order 3 --output-dir runs/k3
 ```
 
-Only the main paper model is included in this anonymous release. Ablation and
-auxiliary analysis runners are intentionally omitted.
 
 ## Outputs
 
@@ -116,8 +114,7 @@ vogrec/graph.py          variable-order state discovery and graph construction
 vogrec/model.py          initialization, StateGNN, routing, resolution score
 vogrec/train_utils.py    tensorization, negative sampling, target lookup, BPR
 vogrec/evaluation.py     complete-catalog HR/NDCG/MRR evaluation
-tests/test_pipeline.py   preprocessing, graph, model, and smoke tests
-```
+
 
 Raw datasets are not redistributed. Obtain them from their official sources and
 pass their local paths through `--data`.

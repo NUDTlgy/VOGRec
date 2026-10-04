@@ -1,12 +1,8 @@
-# VOGRec
+# VOGRec: Variable-Order Item-State Graph Learning for Recommendation
 
-This repository contains the anonymous reference implementation of **VOGRec:
-Variable-Order Item-State Graph Learning for Recommendation**.
+This repository contains the self-contained no-item-bias reference implementation of VOGRec. It implements support-constrained variable-order state discovery, exclusive directed state flows, reliability-guided suffix backoff, directed StateGNN encoding, personalized source routing, candidate-conditioned target resolution, and BPR ranking.
 
-The release implements the model described in the paper: support-constrained
-variable-order state discovery, exclusive directed state flows, reliability-
-guided suffix backoff, directed StateGNN encoding, personalized source routing,
-candidate-conditioned target resolution, and a single BPR-trained ranking score.
+The released code is the no-item-bias model used in our experiments. Its ranking score is the scaled inner product between the routed source representation and the candidate-conditioned target state. No trainable item-bias vector is used.
 
 ## Requirements
 
@@ -18,12 +14,9 @@ Python 3.10 or newer is recommended.
 
 ## Data interface
 
-All datasets use the same loader. JSON, JSONL, compressed JSON/JSONL, CSV, TSV,
-and other delimited text files are accepted. The loader needs a user ID, item
-ID, and timestamp column. Common aliases such as `reviewerID`, `asin`,
-`parent_asin`, `unixReviewTime`, `userId`, and `itemId` are recognized.
+The loader accepts JSON, JSONL, compressed JSON/JSONL, CSV, TSV, and other delimited text files. Each input needs user ID, item ID, and timestamp columns. Common aliases such as `reviewerID`, `asin`, `parent_asin`, `unixReviewTime`, `userId`, and `itemId` are recognized.
 
-The preprocessing protocol is fixed to the paper:
+The preprocessing protocol is:
 
 1. sort each user's interactions chronologically;
 2. remove repeated user-item interactions, keeping the latest event;
@@ -31,16 +24,14 @@ The preprocessing protocol is fixed to the paper:
 4. use the penultimate event for validation and the final event for testing;
 5. construct all state statistics and graphs from training sequences only.
 
-Deduplication is enabled by default and is harmless for an already deduplicated
-dataset such as the Beauty data used in the paper. `--keep-duplicates` is
-available only for controlled diagnostics.
+Deduplication is enabled by default. Use `--keep-duplicates` only for controlled diagnostics.
 
 ## Training
 
 MovieLens-style `::` data without a header:
 
 ```bash
-python train.py \
+python -m VOGRec.trainBPR \
   --data /path/to/ratings.dat \
   --dataset-name MovieLens-1M \
   --delimiter "::" \
@@ -53,7 +44,7 @@ python train.py \
 Amazon Book JSONL:
 
 ```bash
-python train.py \
+python -m VOGRec.trainBPR \
   --data /path/to/Books.jsonl \
   --dataset-name Amazon-Book \
   --user-col user_id \
@@ -66,7 +57,7 @@ python train.py \
 Amazon Beauty review JSON:
 
 ```bash
-python train.py \
+python -m VOGRec.trainBPR \
   --data /path/to/reviews_Beauty_5.json.gz \
   --dataset-name Amazon-Beauty \
   --user-col reviewerID \
@@ -77,44 +68,31 @@ python train.py \
   --output-dir runs/beauty
 ```
 
-The paper defaults are built in: embedding dimension 64, two StateGNN layers,
-maximum order 2, minimum state support 2, backoff weight 0.01, batch size 4096,
-learning rate 0.001, weight decay 0.00001, seed 42, and 800 epochs. Full
-validation runs every 50 epochs through epoch 400 and every 25 epochs afterward.
+The paper defaults are built in: embedding dimension 64, two StateGNN layers, maximum order 2, minimum state support 2, backoff weight 0.01, batch size 4096, learning rate 0.001, weight decay 0.00001, seed 42, and 800 epochs. Checkpoints are selected by full-ranking validation HR@10; the test set is evaluated once after selection.
 
-Checkpoints are selected strictly by full-ranking validation HR@10. The test set
-is evaluated once after training using the validation-selected checkpoint.
-
-## Reproducing the main model
-
-Maximum-order experiments use the same main entry point:
+For maximum-order experiments, use the same entry point:
 
 ```bash
-python train.py --data /path/to/data.csv --max-order 3 --output-dir runs/k3
+python -m VOGRec.trainBPR --data /path/to/data.csv --max-order 3 --output-dir runs/k3
 ```
+
 
 
 ## Outputs
 
-Each run writes:
-
-- `run_config.json`: data, model, graph, and optimization metadata;
-- `state_graph.json`: retained states, reliability, parents, and directed edges;
-- `training_curve.json`: training loss and validation metrics;
-- `best.pt`: checkpoint selected by validation HR@10;
-- `final_results.json`: validation and final full-ranking test metrics.
+Each run writes `run_config.json`, `state_graph.json`, `training_curve.json`, `best.pt`, and `final_results.json`.
 
 ## Code structure
 
 ```text
-train.py                 paper-aligned training and model selection
-trainBPR.py              compatibility entry point for the original layout
-vogrec/data.py           generic loading, deduplication, iterative 5-core, split
-vogrec/graph.py          variable-order state discovery and graph construction
-vogrec/model.py          initialization, StateGNN, routing, resolution score
-vogrec/train_utils.py    tensorization, negative sampling, target lookup, BPR
-vogrec/evaluation.py     complete-catalog HR/NDCG/MRR evaluation
+VOGRec/trainBPR.py       paper-aligned BPR training and model selection
+VOGRec/__init__.py       public package exports
+VOGRec/data.py           loading, deduplication, 5-core filtering, split
+VOGRec/graph.py          variable-order state discovery and graph construction
+VOGRec/model.py          no-item-bias StateGNN, routing, and target resolution
+VOGRec/train_utils.py    tensorization, negative sampling, target lookup, BPR
+VOGRec/evaluation.py     full-catalog HR/NDCG/MRR evaluation
+VOGRec/tests/test_pipeline.py  preprocessing, graph, model, and smoke tests
+```
 
-
-Raw datasets are not redistributed. Obtain them from their official sources and
-pass their local paths through `--data`.
+Raw datasets are not redistributed. Obtain them from their official sources and pass their local paths through `--data`.
